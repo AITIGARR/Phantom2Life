@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "id": "naviyosha",
+  "version": "${version}",
+  "name": "NaviYosha",
+  "description": "Phantom membrane-powered invisible decor items for vanilla clients.",
+  "environment": "*",
+  "entrypoints": { "main": ["ru.naviyosha.NaviYosha"] },
+  "depends": { "fabricloader": ">=0.18.0", "minecraft": "~1.21.11", "java": ">=21", "fabric-api": "*" }
+}
