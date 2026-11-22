@@ -3,7 +3,7 @@
   "id": "naviyosha",
   "version": "${version}",
   "name": "Phantom2Life",
-  "description": "Native invisible sign blocks and invisible frames for vanilla clients, with an optional resource pack.",
+  "description": "Phantom2Life with separate Polymer sign block IDs and native SignBlockEntity text, for vanilla clients.",
   "environment": "server",
   "entrypoints": {
     "main": [
@@ -14,7 +14,8 @@
     "fabricloader": ">=0.18.0",
     "minecraft": "~1.21.11",
     "java": ">=21",
-    "fabric-api": "*"
+    "fabric-api": "*",
+    "polymer-core": ">=0.15.2"
   },
   "mixins": [
     "phantom2life.mixins.json"

@@ -1,5 +1,7 @@
 {
   "item.naviyosha.invisible_frame": "Невидимая рамка",
   "item.naviyosha.invisible_glow_frame": "Невидимая светящаяся рамка",
-  "item.naviyosha.invisible_sign": "Невидимая табличка"
+  "item.naviyosha.invisible_sign": "Невидимая табличка",
+  "block.naviyosha.invisible_sign": "Невидимая табличка",
+  "block.naviyosha.invisible_wall_sign": "Невидимая настенная табличка"
 }

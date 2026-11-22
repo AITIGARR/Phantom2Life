@@ -1,7 +1,7 @@
-name: Build Phantom2Life 1.3 (native sign blocks)
+name: Build Phantom2Life Polymer 1.4
 on:
   push:
-    branches: [main, fix/native-sign-block-1-3-0]
+    branches: [main, feature/polymer-native-sign-blocks]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -18,26 +18,45 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.14'
-      - name: Compile
-        run: gradle --no-daemon clean build
-      - name: Package and verify
+      - name: Compile and remap
+        run: gradle --no-daemon clean build --stacktrace
+      - name: Smoke-test dedicated Fabric server
+        run: |
+          mkdir -p run
+          echo eula=true > run/eula.txt
+          set +e
+          timeout 115s gradle --no-daemon runServer > dedicated-server.log 2>&1
+          RC=$?
+          set -e
+          if ! grep -q "Done (" dedicated-server.log; then
+            echo "Server failed to finish starting (exit=$RC)"
+            tail -n 140 dedicated-server.log
+            exit 1
+          fi
+          echo "Fabric server started successfully with Polymer"
+      - name: Prepare mod and resource pack
         run: |
           mkdir -p output
-          cp build/libs/Phantom2Life-1.3.0.jar output/Phantom2Life-1.3.0.jar
+          cp build/libs/Phantom2Life-1.4.0.jar output/Phantom2Life-1.4.0.jar
           python3 - <<'PY'
-          import zipfile, pathlib, json
-          src=pathlib.Path('resource-pack')
-          out=pathlib.Path('output/Phantom2Life-resource-pack-1.3.0.zip')
+          import pathlib,zipfile,json
+          root=pathlib.Path('resource-pack')
+          out=pathlib.Path('output/Phantom2Life-resource-pack-1.4.0.zip')
           with zipfile.ZipFile(out,'w',zipfile.ZIP_DEFLATED) as z:
-              for f in sorted(src.rglob('*')):
-                  if f.is_file(): z.write(f,f.relative_to(src).as_posix())
+              for path in sorted(root.rglob('*')):
+                  if path.is_file(): z.write(path,path.relative_to(root).as_posix())
           with zipfile.ZipFile(out) as z:
               assert z.testzip() is None
-              assert json.loads(z.read('pack.mcmeta'))['pack']['pack_format']==75
               assert 'assets/minecraft/textures/entity/signs/pale_oak.png' in z.namelist()
+              assert json.loads(z.read('pack.mcmeta'))['pack']['pack_format']==75
+          with zipfile.ZipFile('output/Phantom2Life-1.4.0.jar') as z:
+              assert z.testzip() is None
+              assert 'ru/naviyosha/PhantomSignBlocks.class' in z.namelist()
+              assert 'ru/naviyosha/PhantomSignBlocks$Standing.class' in z.namelist()
+              assert 'ru/naviyosha/PhantomSignBlocks$Wall.class' in z.namelist()
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: Phantom2Life-1.3.0
+          name: Phantom2Life-Polymer-1.4.0
           path: output/*
           if-no-files-found: error

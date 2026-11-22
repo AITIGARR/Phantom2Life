@@ -5,12 +5,13 @@ plugins {
 version = project.mod_version
 group = project.maven_group
 base { archivesName = 'Phantom2Life' }
-repositories { mavenCentral(); maven { url = "https://maven.fabricmc.net/" } }
+repositories { mavenCentral(); maven { url = "https://maven.fabricmc.net/" }; maven { url = "https://maven.nucleoid.xyz/" } }
 dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
     mappings loom.officialMojangMappings()
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
     modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+    modImplementation "eu.pb4:polymer-core:0.15.2+1.21.11"
 }
 java { toolchain { languageVersion = JavaLanguageVersion.of(21) }; withSourcesJar() }
 tasks.withType(JavaCompile).configureEach { options.release = 21 }
