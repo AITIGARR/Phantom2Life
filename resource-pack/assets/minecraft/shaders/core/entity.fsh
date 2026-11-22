@@ -25,8 +25,16 @@ void main() {
     // Phantom2Life: discard the unique transparent sign atlas marker even
     // when a third-party renderer does not honour ALPHA_CUTOUT.
     const vec4 phantomSignMarker = vec4(17.0/255.0, 29.0/255.0, 41.0/255.0, 15.0/255.0);
-    if (abs(color.a - phantomSignMarker.a) < 0.009
-        && distance(color.rgb, phantomSignMarker.rgb) < 0.025) {
+    // Some renderers/atlas pipelines lose or normalize the texture alpha.
+    // Match this sign-only RGB marker independently of alpha. This is a
+    // temporary client compatibility workaround, not a new block renderer.
+    vec3 phantomSignRGB = phantomSignMarker.rgb;
+    if (distance(color.rgb, phantomSignRGB) < 0.095) {
+        discard;
+    }
+    // Also match color if the atlas uses premultiplied alpha.
+    if (color.a > 0.0 && color.a < 0.20
+        && distance(color.rgb / max(color.a, 0.001), phantomSignRGB) < 0.095) {
         discard;
     }
 #ifdef ALPHA_CUTOUT
