@@ -243,36 +243,6 @@ public final class PhantomSignVisuals {
         player.connection.send(new ClientboundOpenSignEditorPacket(proxy, true));
     }
 
-    /** Explicit fallback for clients whose entity raytrace cannot click Interaction entities. */
-    public static int editNearest(ServerPlayer player) {
-        ServerLevel level = player.level();
-        BlockPos center = player.blockPosition();
-        BlockPos nearest = null;
-        double distance = 36.0;
-        for (BlockPos candidate : BlockPos.betweenClosed(
-                center.offset(-5, -4, -5), center.offset(5, 4, 5))) {
-            if (!level.hasChunkAt(candidate) || !PhantomSignBlocks.isOurBlock(level.getBlockState(candidate))) {
-                continue;
-            }
-            double d = candidate.getCenter().distanceToSqr(player.position());
-            if (d < distance && level.getBlockEntity(candidate) instanceof SignBlockEntity) {
-                distance = d;
-                nearest = candidate.immutable();
-            }
-        }
-        if (nearest == null) {
-            player.sendSystemMessage(Component.literal("Рядом нет невидимой таблички (до 6 блоков)"));
-            return 0;
-        }
-        SignBlockEntity sign = (SignBlockEntity) level.getBlockEntity(nearest);
-        if (sign == null || sign.isWaxed()) {
-            player.sendSystemMessage(Component.literal("Табличка покрыта воском или недоступна"));
-            return 0;
-        }
-        openEditor(player, nearest, sign, sign.isFacingFrontText(player));
-        return 1;
-    }
-
     /** Returns true if this is a proxy-editor response for our real server block. */
     public static boolean acceptSignPacket(ServerPlayer player, ServerboundSignUpdatePacket packet) {
         Edit session = EDITS.get(player.getUUID());
