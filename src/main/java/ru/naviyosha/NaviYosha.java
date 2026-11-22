@@ -53,6 +53,7 @@ public final class NaviYosha implements ModInitializer {
 
     @Override public void onInitialize() {
         PhantomSignBlocks.initialize();
+        PhantomSignVisuals.initialize();
         // New recipes create the real vanilla pale oak sign block.
         // Use vanilla SignItem placement, SignBlockEntity and editor; do not
         // convert new signs to text_display / interaction entities.
@@ -155,6 +156,7 @@ public final class NaviYosha implements ModInitializer {
 
     /** Called by the packet mixin before vanilla looks for a real server-side sign. */
     public static boolean acceptSignPacket(ServerPlayer player, ServerboundSignUpdatePacket packet) {
+        if (PhantomSignVisuals.acceptSignPacket(player, packet)) return true;
         EditorSession session = EDITORS.get(player.getUUID());
         if (session == null || !session.proxy.equals(packet.getPos())) return false;
         EDITORS.remove(player.getUUID());

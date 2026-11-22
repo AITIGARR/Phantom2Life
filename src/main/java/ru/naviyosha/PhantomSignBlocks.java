@@ -18,6 +18,11 @@ import net.minecraft.world.level.block.SignBlock;
 import net.minecraft.world.level.block.StandingSignBlock;
 import net.minecraft.world.level.block.WallSignBlock;
 import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.SignBlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityTicker;
+import net.minecraft.world.level.Level;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.WoodType;
@@ -26,11 +31,11 @@ import xyz.nucleoid.packettweaker.PacketContext;
 /**
  * Two separate registered server-side sign BLOCKS (standing + wall) and one
  * registered sign ITEM. Polymer maps their block states to vanilla pale-oak
- * sign states for clients; the server stores naviyosha:* IDs in the world.
+ * invisible structure_void states for vanilla clients; the real server IDs persist.
  *
- * Native SignBlockEntity rendering, native editing and dye/wax handling remain
- * entirely vanilla. There are no TextDisplay or Interaction entities for new
- * signs. A client resource pack hides the pale-oak sign board texture.
+ * The block and its SignBlockEntity are real. On clients that cannot render
+ * transparent sign textures, lightweight helpers show only text and accept
+ * interactions. No sign boards are drawn by the client.
  */
 public final class PhantomSignBlocks {
     public static final String ID = "naviyosha";
@@ -39,6 +44,10 @@ public final class PhantomSignBlocks {
     public static final Item SIGN_ITEM = registerItem();
 
     private PhantomSignBlocks() {}
+
+    public static boolean isOurBlock(BlockState state) {
+        return state.is(SIGN) || state.is(WALL_SIGN);
+    }
 
     private static Block registerBlock(String path, Block base, java.util.function.Function<BlockBehaviour.Properties, Block> creator) {
         var id = Identifier.fromNamespaceAndPath(ID, path);
@@ -69,9 +78,20 @@ public final class PhantomSignBlocks {
 
         @Override
         public BlockState getPolymerBlockState(BlockState state, PacketContext context) {
-            return Blocks.PALE_OAK_SIGN.defaultBlockState()
-                .setValue(StandingSignBlock.ROTATION, state.getValue(StandingSignBlock.ROTATION))
-                .setValue(SignBlock.WATERLOGGED, state.getValue(SignBlock.WATERLOGGED));
+            return Blocks.STRUCTURE_VOID.defaultBlockState();
+        }
+
+        @Override
+        public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type) {
+            if (type != BlockEntityType.SIGN) return null;
+            return (world, pos, blockState, blockEntity) -> {
+                if (blockEntity instanceof SignBlockEntity sign) {
+                    SignBlockEntity.tick(world, pos, blockState, sign);
+                    if (world instanceof ServerLevel server) {
+                        PhantomSignVisuals.tick(server, pos, sign, blockState);
+                    }
+                }
+            };
         }
     }
 
@@ -82,9 +102,20 @@ public final class PhantomSignBlocks {
 
         @Override
         public BlockState getPolymerBlockState(BlockState state, PacketContext context) {
-            return Blocks.PALE_OAK_WALL_SIGN.defaultBlockState()
-                .setValue(WallSignBlock.FACING, state.getValue(WallSignBlock.FACING))
-                .setValue(SignBlock.WATERLOGGED, state.getValue(SignBlock.WATERLOGGED));
+            return Blocks.STRUCTURE_VOID.defaultBlockState();
+        }
+
+        @Override
+        public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type) {
+            if (type != BlockEntityType.SIGN) return null;
+            return (world, pos, blockState, blockEntity) -> {
+                if (blockEntity instanceof SignBlockEntity sign) {
+                    SignBlockEntity.tick(world, pos, blockState, sign);
+                    if (world instanceof ServerLevel server) {
+                        PhantomSignVisuals.tick(server, pos, sign, blockState);
+                    }
+                }
+            };
         }
     }
 
