@@ -6,6 +6,7 @@ import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.player.AttackEntityCallback;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.Direction;
 import net.minecraft.core.BlockPos;
@@ -47,6 +48,8 @@ public final class NaviYosha implements ModInitializer {
     private static final String LINK = "p2l-link-";
     private static final String WOOD = "p2l-wood-";
     private static final String WAX = "p2l-waxed";
+    private static final String EMPTY = "p2l-empty";
+    private static int tickCounter;
     private static final Map<UUID, EditorSession> EDITORS = new ConcurrentHashMap<>();
     private record EditorSession(BlockPos proxy, String link, net.minecraft.world.phys.Vec3 targetPos) {}
 
@@ -69,13 +72,15 @@ public final class NaviYosha implements ModInitializer {
             text.setPos(x, y, z);
             text.setBillboardConstraints(Display.BillboardConstraints.CENTER);
             text.setBackgroundColor(0);
-            text.setText(Component.literal(""));
+            text.setText(Component.literal("[ Написать ]").withStyle(style -> style.withColor(0x55FFFF).withItalic(true)));
+            text.setGlowingTag(true);
             text.addTag(MARK); text.addTag(link);
             Interaction target = new Interaction(EntityType.INTERACTION, server);
             target.setPos(x, y, z); target.setWidth(.9f); target.setHeight(.6f);
-            target.addTag(MARK); target.addTag(link); target.addTag(WOOD + wood);
+            target.addTag(MARK); target.addTag(link); target.addTag(WOOD + wood); target.addTag(EMPTY);
             server.addFreshEntity(text); server.addFreshEntity(target);
             if (!player.getAbilities().instabuild) stack.shrink(1);
+            if (player instanceof ServerPlayer sp) openEditor(sp, target, text);
             return InteractionResult.SUCCESS;
         });
         UseEntityCallback.EVENT.register((player, level, hand, entity, hit) -> {
@@ -114,6 +119,18 @@ public final class NaviYosha implements ModInitializer {
             target.discard();
             return InteractionResult.SUCCESS;
         });
+        // Upgrade blank signs placed by earlier releases when a player approaches.
+        ServerTickEvents.END_SERVER_TICK.register(server -> {
+            if (++tickCounter % 20 != 0) return;
+            for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+                ServerLevel world = player.level();
+                for (Interaction sign : world.getEntitiesOfClass(Interaction.class,
+                    player.getBoundingBox().inflate(24), e -> e.getTags().contains(MARK) && !e.getTags().contains(EMPTY))) {
+                    Display.TextDisplay text = paired(world, sign);
+                    if (text != null && text.getText().getString().isBlank()) updateDisplay(sign, text, "");
+                }
+            }
+        });
         CommandRegistrationCallback.EVENT.register((dispatcher, registry, environment) ->
             dispatcher.register(Commands.literal("p2l").then(Commands.literal("text")
                 .then(Commands.argument("message", StringArgumentType.greedyString()).executes(ctx -> {
@@ -125,7 +142,7 @@ public final class NaviYosha implements ModInitializer {
                     if (target == null || target.getTags().contains(WAX)) return 0;
                     Display.TextDisplay text = paired(player.level(), target);
                     if (text == null) return 0;
-                    text.setText(Component.literal(message).withStyle(text.getText().getStyle()));
+                    updateDisplay(target, text, message);
                     ctx.getSource().sendSuccess(() -> Component.literal("Текст таблички обновлён"), false);
                     return 1;
                 })))));
@@ -146,7 +163,7 @@ public final class NaviYosha implements ModInitializer {
         var state = Blocks.OAK_SIGN.defaultBlockState();
         SignBlockEntity fake = new SignBlockEntity(proxy, state);
         fake.setLevel(level);
-        String[] lines = display.getText().getString().split("\n", -1);
+        String[] lines = target.getTags().contains(EMPTY) ? new String[0] : display.getText().getString().split("\n", -1);
         SignText signText = fake.getFrontText();
         for (int i = 0; i < Math.min(4, lines.length); i++)
             signText = signText.setMessage(i, Component.literal(lines[i]));
@@ -169,13 +186,26 @@ public final class NaviYosha implements ModInitializer {
                 e -> e.getTags().contains(session.link)).stream().findFirst().orElse(null);
             if (target != null && !target.getTags().contains(WAX)) {
                 Display.TextDisplay text = paired(level, target);
-                if (text != null) text.setText(Component.literal(String.join("\n", packet.getLines()))
-                    .withStyle(text.getText().getStyle()));
+                if (text != null) updateDisplay(target, text, String.join("\n", packet.getLines()));
             }
             player.connection.send(new ClientboundBlockUpdatePacket(level, session.proxy));
         });
         return true;
     }
 
+
+    private static void updateDisplay(Interaction target, Display.TextDisplay display, String value) {
+        if (value.isBlank()) {
+            target.addTag(EMPTY);
+            display.setText(Component.literal("[ Написать ]")
+                .withStyle(style -> style.withColor(0x55FFFF).withItalic(true)));
+            display.setGlowingTag(true);
+        } else {
+            target.removeTag(EMPTY);
+            display.setText(Component.literal(value)
+                .withStyle(display.getText().getStyle().withItalic(false)));
+            display.setGlowingTag(false);
+        }
+    }
 
 }
