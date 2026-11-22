@@ -70,7 +70,8 @@ public final class NaviYosha implements ModInitializer {
             ServerLevel server = (ServerLevel) level;
             Display.TextDisplay text = new Display.TextDisplay(EntityType.TEXT_DISPLAY, server);
             text.setPos(x, y, z);
-            text.setBillboardConstraints(Display.BillboardConstraints.CENTER);
+            text.setBillboardConstraints(Display.BillboardConstraints.FIXED);
+            text.setYRot(face.getAxis().isVertical() ? player.getYRot() + 180f : face.toYRot());
             text.setBackgroundColor(0);
             text.setText(Component.literal("[ Написать ]").withStyle(style -> style.withColor(0x55FFFF).withItalic(true)));
             text.setGlowingTag(true);
@@ -127,7 +128,10 @@ public final class NaviYosha implements ModInitializer {
                 for (Interaction sign : world.getEntitiesOfClass(Interaction.class,
                     player.getBoundingBox().inflate(24), e -> e.getTags().contains(MARK) && !e.getTags().contains(EMPTY))) {
                     Display.TextDisplay text = paired(world, sign);
-                    if (text != null && text.getText().getString().isBlank()) updateDisplay(sign, text, "");
+                    if (text == null) continue;
+                    if (text.getBillboardConstraints() != Display.BillboardConstraints.FIXED)
+                        text.setBillboardConstraints(Display.BillboardConstraints.FIXED);
+                    if (text.getText().getString().isBlank()) updateDisplay(sign, text, "");
                 }
             }
         });
