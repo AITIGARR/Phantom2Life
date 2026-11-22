@@ -1,5 +1,7 @@
 {
   "item.naviyosha.invisible_frame": "Invisible Frame",
   "item.naviyosha.invisible_glow_frame": "Invisible Glow Frame",
-  "item.naviyosha.invisible_sign": "Invisible Sign"
+  "item.naviyosha.invisible_sign": "Invisible Sign",
+  "block.naviyosha.invisible_sign": "Invisible Sign",
+  "block.naviyosha.invisible_wall_sign": "Invisible Wall Sign"
 }

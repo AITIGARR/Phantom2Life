@@ -52,6 +52,7 @@ public final class NaviYosha implements ModInitializer {
     private record EditorSession(BlockPos proxy, String link, net.minecraft.world.phys.Vec3 targetPos) {}
 
     @Override public void onInitialize() {
+        PhantomSignBlocks.initialize();
         // New recipes create the real vanilla pale oak sign block.
         // Use vanilla SignItem placement, SignBlockEntity and editor; do not
         // convert new signs to text_display / interaction entities.
@@ -82,7 +83,7 @@ public final class NaviYosha implements ModInitializer {
             if (text != null) text.discard();
             // Legacy 1.2.3 ghost-sign items must also become real vanilla sign
             // blocks when placed again; keep the server-only recipe marker.
-            ItemStack drop = new ItemStack(Items.PALE_OAK_SIGN);
+            ItemStack drop = new ItemStack(PhantomSignBlocks.SIGN_ITEM);
             CompoundTag tag = new CompoundTag();
             tag.putString("phantom2life_kind", "sign");
             tag.putBoolean("phantom2life_native_sign", true);
