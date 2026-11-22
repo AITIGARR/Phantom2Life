@@ -1,12 +1,9 @@
 package ru.naviyosha;
 
-import com.mojang.brigadier.arguments.StringArgumentType;
 import net.fabricmc.api.ModInitializer;
-import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.player.AttackEntityCallback;
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
-import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
@@ -111,21 +108,6 @@ public final class NaviYosha implements ModInitializer {
                 }
             }
         });
-        CommandRegistrationCallback.EVENT.register((dispatcher, registry, environment) ->
-            dispatcher.register(Commands.literal("p2l").then(Commands.literal("text")
-                .then(Commands.argument("message", StringArgumentType.greedyString()).executes(ctx -> {
-                    ServerPlayer player = ctx.getSource().getPlayerOrException();
-                    String message = StringArgumentType.getString(ctx, "message");
-                    Interaction target = player.level().getEntitiesOfClass(Interaction.class,
-                        player.getBoundingBox().inflate(5), e -> e.getTags().contains(MARK))
-                        .stream().min((a,b) -> Double.compare(a.distanceToSqr(player), b.distanceToSqr(player))).orElse(null);
-                    if (target == null || target.getTags().contains(WAX)) return 0;
-                    Display.TextDisplay text = paired(player.level(), target);
-                    if (text == null) return 0;
-                    updateDisplay(target, text, message);
-                    ctx.getSource().sendSuccess(() -> Component.literal("Текст таблички обновлён"), false);
-                    return 1;
-                })))));
     }
 
     private static Display.TextDisplay paired(ServerLevel level, Interaction target) {
