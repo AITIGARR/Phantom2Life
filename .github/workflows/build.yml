@@ -48,6 +48,8 @@ jobs:
           with zipfile.ZipFile(out) as z:
               assert z.testzip() is None
               assert 'assets/minecraft/textures/entity/signs/pale_oak.png' in z.namelist()
+              assert 'assets/minecraft/shaders/core/entity.fsh' in z.namelist()
+              assert b'phantomSignMarker' in z.read('assets/minecraft/shaders/core/entity.fsh')
               assert json.loads(z.read('pack.mcmeta'))['pack']['pack_format']==75
           with zipfile.ZipFile('output/Phantom2Life-1.4.0.jar') as z:
               assert z.testzip() is None
