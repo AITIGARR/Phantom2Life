@@ -1,6 +1,6 @@
-# NaviYosha 1.0.0 — Fabric 1.21.11
+# Phantom2Life 1.0.1 — Fabric 1.21.11
 
-Серверный мод добавляет два бесформенных крафта: мембрана + рамка и мембрана + светящаяся рамка. Результаты — отдельные по компонентам vanilla stacks с именем, лором, моделью `naviyosha` и `entity_data` с `Invisible:1b`. Обычные рамки не меняются.
+Серверный мод добавляет два бесформенных крафта: мембрана + рамка и мембрана + светящаяся рамка. Результаты — ванильные предметы с отдельными компонентами с именем, лором и блеском, `entity_data` с `Invisible:1b`. Обычные рамки не меняются.
 
 ## Сборка
 
@@ -8,8 +8,8 @@ Java 21 и Gradle 8.14: `gradle build`. JAR из `build/libs/` положить 
 
 ```properties
 require-resource-pack=true
-resource-pack=https://example.org/naviyosha-resource-pack.zip
-resource-pack-sha1=<sha1 zip>
+resource-pack=https://raw.githubusercontent.com/AITIGARR/Phantom2Life/main/dist/Phantom2Life-resource-pack-1.0.1.zip
+resource-pack-sha1=57fb02f499633d22ab9c8aa6ffbad34c53c130bd
 ```
 
 ## Ограничения

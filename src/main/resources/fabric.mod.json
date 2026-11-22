@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "naviyosha",
   "version": "${version}",
-  "name": "NaviYosha",
+  "name": "Phantom2Life",
   "description": "Phantom membrane-powered invisible decor items for vanilla clients.",
   "environment": "*",
   "entrypoints": { "main": ["ru.naviyosha.NaviYosha"] },
