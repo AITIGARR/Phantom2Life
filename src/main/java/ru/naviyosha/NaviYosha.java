@@ -80,10 +80,12 @@ public final class NaviYosha implements ModInitializer {
             if (level.isClientSide() || !(entity instanceof Interaction target) || !target.getTags().contains(MARK)) return InteractionResult.PASS;
             Display.TextDisplay text = paired((ServerLevel) level, target);
             if (text != null) text.discard();
-            String wood = target.getTags().stream().filter(s -> s.startsWith(WOOD)).findFirst().orElse(WOOD + "oak_sign").substring(WOOD.length());
-            Item item = BuiltInRegistries.ITEM.getValue(Identifier.withDefaultNamespace(wood));
-            ItemStack drop = new ItemStack(item == null ? Items.OAK_SIGN : item);
-            CompoundTag tag = new CompoundTag(); tag.putString("phantom2life_kind", "sign");
+            // Legacy 1.2.3 ghost-sign items must also become real vanilla sign
+            // blocks when placed again; keep the server-only recipe marker.
+            ItemStack drop = new ItemStack(Items.PALE_OAK_SIGN);
+            CompoundTag tag = new CompoundTag();
+            tag.putString("phantom2life_kind", "sign");
+            tag.putBoolean("phantom2life_native_sign", true);
             drop.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
             drop.set(DataComponents.CUSTOM_NAME, Component.literal("Невидимая табличка"));
             drop.set(DataComponents.LORE, new ItemLore(List.of(Component.literal("Декор из фантомной мембраны"))));
