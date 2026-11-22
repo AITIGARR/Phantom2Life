@@ -45,6 +45,10 @@ public final class PhantomSignBlocks {
 
     private PhantomSignBlocks() {}
 
+    public static boolean isOurBlock(BlockState state) {
+        return state.is(SIGN) || state.is(WALL_SIGN);
+    }
+
     private static Block registerBlock(String path, Block base, java.util.function.Function<BlockBehaviour.Properties, Block> creator) {
         var id = Identifier.fromNamespaceAndPath(ID, path);
         ResourceKey<Block> key = ResourceKey.create(Registries.BLOCK, id);
