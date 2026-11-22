@@ -188,12 +188,12 @@ public final class PhantomSignVisuals {
         List<Display.TextDisplay> displays = level.getEntitiesOfClass(Display.TextDisplay.class,
             new AABB(pos).inflate(1.2), e -> e.getTags().contains(tag) && e.blockPosition().equals(pos));
         Display.TextDisplay display = displays.isEmpty() ? null : displays.get(0);
-        if (display == null) {
+        boolean created = display == null;
+        if (created) {
             display = new Display.TextDisplay(EntityType.TEXT_DISPLAY, level);
             display.setBillboardConstraints(Display.BillboardConstraints.FIXED);
             display.setBackgroundColor(0);
             display.addTag(tag);
-            level.addFreshEntity(display);
         }
         // Recalculate the visual transform on every sync, including for
         // already-placed 1.5.0 signs. The former Y + 0.76 was too high.
@@ -220,6 +220,8 @@ public final class PhantomSignVisuals {
                 .withStyle(style -> style.withColor(text.getColor().getTextColor())));
         }
         if (!display.getText().equals(message)) display.setText(message);
+        // Entity must enter the correct chunk at the final position.
+        if (created) level.addFreshEntity(display);
     }
 
     private static void openEditor(ServerPlayer player, BlockPos pos, SignBlockEntity sign, boolean front) {
