@@ -8,6 +8,16 @@ import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.Direction;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
+import net.minecraft.network.protocol.game.ClientboundOpenSignEditorPacket;
+import net.minecraft.network.protocol.game.ServerboundSignUpdatePacket;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.entity.SignBlockEntity;
+import net.minecraft.world.level.block.entity.SignText;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
@@ -37,6 +47,8 @@ public final class NaviYosha implements ModInitializer {
     private static final String LINK = "p2l-link-";
     private static final String WOOD = "p2l-wood-";
     private static final String WAX = "p2l-waxed";
+    private static final Map<UUID, EditorSession> EDITORS = new ConcurrentHashMap<>();
+    private record EditorSession(BlockPos proxy, String link, net.minecraft.world.phys.Vec3 targetPos) {}
 
     @Override public void onInitialize() {
         UseBlockCallback.EVENT.register((player, level, hand, hit) -> {
@@ -82,7 +94,7 @@ public final class NaviYosha implements ModInitializer {
                 text.setText(text.getText().copy().withStyle(style -> style.withColor(rgb)));
                 if (!player.getAbilities().instabuild) held.shrink(1);
             } else if (player instanceof ServerPlayer sp) {
-                sp.displayClientMessage(Component.literal("Текст: /p2l text <сообщение>. Цвет: краситель. Воск: медовые соты."), false);
+                openEditor(sp, target, text);
             }
             return InteractionResult.SUCCESS;
         });
@@ -125,4 +137,45 @@ public final class NaviYosha implements ModInitializer {
         return level.getEntitiesOfClass(Display.TextDisplay.class, new AABB(target.blockPosition()).inflate(2),
             e -> e.getTags().contains(link)).stream().findFirst().orElse(null);
     }
+    /** A client-only proxy SignBlockEntity lets the vanilla sign screen open. */
+    private static void openEditor(ServerPlayer player, Interaction target, Display.TextDisplay display) {
+        ServerLevel level = player.level();
+        BlockPos proxy = player.blockPosition().atY(level.getMinY() + 1);
+        String link = target.getTags().stream().filter(s -> s.startsWith(LINK)).findFirst().orElse("");
+        if (link.isEmpty()) return;
+        var state = Blocks.OAK_SIGN.defaultBlockState();
+        SignBlockEntity fake = new SignBlockEntity(proxy, state);
+        fake.setLevel(level);
+        String[] lines = display.getText().getString().split("\n", -1);
+        SignText signText = fake.getFrontText();
+        for (int i = 0; i < Math.min(4, lines.length); i++)
+            signText = signText.setMessage(i, Component.literal(lines[i]));
+        fake.setText(signText, true);
+        EDITORS.put(player.getUUID(), new EditorSession(proxy, link, target.position()));
+        player.connection.send(new ClientboundBlockUpdatePacket(proxy, state));
+        player.connection.send(ClientboundBlockEntityDataPacket.create(fake));
+        player.connection.send(new ClientboundOpenSignEditorPacket(proxy, true));
+    }
+
+    /** Called by the packet mixin before vanilla looks for a real server-side sign. */
+    public static boolean acceptSignPacket(ServerPlayer player, ServerboundSignUpdatePacket packet) {
+        EditorSession session = EDITORS.get(player.getUUID());
+        if (session == null || !session.proxy.equals(packet.getPos())) return false;
+        EDITORS.remove(player.getUUID());
+        player.level().getServer().execute(() -> {
+            ServerLevel level = player.level();
+            Interaction target = level.getEntitiesOfClass(Interaction.class,
+                new AABB(session.targetPos, session.targetPos).inflate(1),
+                e -> e.getTags().contains(session.link)).stream().findFirst().orElse(null);
+            if (target != null && !target.getTags().contains(WAX)) {
+                Display.TextDisplay text = paired(level, target);
+                if (text != null) text.setText(Component.literal(String.join("\n", packet.getLines()))
+                    .withStyle(text.getText().getStyle()));
+            }
+            player.connection.send(new ClientboundBlockUpdatePacket(level, session.proxy));
+        });
+        return true;
+    }
+
+
 }
