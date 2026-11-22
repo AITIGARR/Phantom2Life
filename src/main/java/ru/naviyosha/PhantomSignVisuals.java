@@ -2,6 +2,9 @@ package ru.naviyosha;
 
 import net.fabricmc.fabric.api.event.player.AttackEntityCallback;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
+import net.fabricmc.fabric.api.event.player.UseItemCallback;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.BlockHitResult;
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.core.BlockPos;
@@ -58,9 +61,20 @@ public final class PhantomSignVisuals {
     private PhantomSignVisuals() {}
 
     public static void initialize() {
+        // Mobile clients can treat the Polymer replacement as air and fail to
+        // target the Interaction hitbox. Handle the normal right-click packet
+        // by tracing against the REAL server-side SignBlock outline.
+        UseItemCallback.EVENT.register((player, world, hand) -> {
+            if (!(world instanceof ServerLevel) || !(player instanceof ServerPlayer sp)
+                || player.isSpectator()) return InteractionResult.PASS;
+            return tryOpenFromRay(sp, hand);
+        });
+
         UseBlockCallback.EVENT.register((player, world, hand, hit) -> {
             if (!(world instanceof ServerLevel level) || !(player instanceof ServerPlayer sp)
                 || hand != InteractionHand.MAIN_HAND || player.isSpectator()) return InteractionResult.PASS;
+            InteractionResult edit = tryOpenFromRay(sp, hand);
+            if (edit != InteractionResult.PASS) return edit;
             if (!player.getItemInHand(hand).is(PhantomSignBlocks.SIGN_ITEM)) return InteractionResult.PASS;
             BlockPos clicked = hit.getBlockPos();
             BlockPos target = level.getBlockState(clicked).canBeReplaced()
@@ -222,6 +236,23 @@ public final class PhantomSignVisuals {
         if (!display.getText().equals(message)) display.setText(message);
         // Entity must enter the correct chunk at the final position.
         if (created) level.addFreshEntity(display);
+    }
+
+    private static InteractionResult tryOpenFromRay(ServerPlayer player, InteractionHand hand) {
+        if (hand != InteractionHand.MAIN_HAND || !player.getMainHandItem().isEmpty()) {
+            return InteractionResult.PASS;
+        }
+        HitResult ray = player.pick(5.0, 0.0f, false);
+        if (!(ray instanceof BlockHitResult hit)) return InteractionResult.PASS;
+        ServerLevel level = player.level();
+        BlockPos pos = hit.getBlockPos();
+        if (!PhantomSignBlocks.isOurBlock(level.getBlockState(pos))
+            || !(level.getBlockEntity(pos) instanceof SignBlockEntity sign)) {
+            return InteractionResult.PASS;
+        }
+        if (sign.isWaxed()) return InteractionResult.SUCCESS;
+        openEditor(player, pos, sign, sign.isFacingFrontText(player));
+        return InteractionResult.SUCCESS;
     }
 
     private static void openEditor(ServerPlayer player, BlockPos pos, SignBlockEntity sign, boolean front) {
