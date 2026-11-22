@@ -20,6 +20,20 @@ jobs:
           gradle-version: '8.14'
       - name: Compile and remap
         run: gradle --no-daemon clean build --stacktrace
+      - name: Smoke-test dedicated Fabric server
+        run: |
+          mkdir -p run
+          echo eula=true > run/eula.txt
+          set +e
+          timeout 115s gradle --no-daemon runServer > dedicated-server.log 2>&1
+          RC=$?
+          set -e
+          if ! grep -q "Done (" dedicated-server.log; then
+            echo "Server failed to finish starting (exit=$RC)"
+            tail -n 140 dedicated-server.log
+            exit 1
+          fi
+          echo "Fabric server started successfully with Polymer"
       - name: Prepare mod and resource pack
         run: |
           mkdir -p output
