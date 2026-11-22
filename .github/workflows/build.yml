@@ -1,7 +1,7 @@
-name: Build Phantom2Life 1.5 (invisible sign / visible text)
+name: Build Phantom2Life 1.5.1 (sign editor and position)
 on:
   push:
-    branches: [main, fix/invisible-polymer-block-visible-text]
+    branches: [main, fix/sign-editor-hitbox-height-1-5-1]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -37,11 +37,11 @@ jobs:
       - name: Package mod and resource pack
         run: |
           mkdir -p output
-          cp build/libs/Phantom2Life-1.5.0.jar output/Phantom2Life-1.5.0.jar
+          cp build/libs/Phantom2Life-1.5.1.jar output/Phantom2Life-1.5.1.jar
           python3 - <<'PY'
           import pathlib,zipfile,json
           root=pathlib.Path('resource-pack')
-          out=pathlib.Path('output/Phantom2Life-resource-pack-1.5.0.zip')
+          out=pathlib.Path('output/Phantom2Life-resource-pack-1.5.1.zip')
           with zipfile.ZipFile(out,'w',zipfile.ZIP_DEFLATED) as z:
               for path in sorted(root.rglob('*')):
                   if path.is_file(): z.write(path,path.relative_to(root).as_posix())
@@ -50,13 +50,13 @@ jobs:
               assert 'assets/minecraft/textures/entity/signs/pale_oak.png' not in z.namelist()
               assert 'assets/minecraft/shaders/core/entity.fsh' not in z.namelist()
               assert json.loads(z.read('pack.mcmeta'))['pack']['pack_format']==75
-          with zipfile.ZipFile('output/Phantom2Life-1.5.0.jar') as z:
+          with zipfile.ZipFile('output/Phantom2Life-1.5.1.jar') as z:
               assert z.testzip() is None
               assert 'ru/naviyosha/PhantomSignBlocks.class' in z.namelist()
               assert 'ru/naviyosha/PhantomSignVisuals.class' in z.namelist()
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: Phantom2Life-1.5.0
+          name: Phantom2Life-1.5.1
           path: output/*
           if-no-files-found: error

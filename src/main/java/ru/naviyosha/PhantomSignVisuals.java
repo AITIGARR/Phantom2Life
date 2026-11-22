@@ -2,6 +2,9 @@ package ru.naviyosha;
 
 import net.fabricmc.fabric.api.event.player.AttackEntityCallback;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
+import net.fabricmc.fabric.api.event.player.UseItemCallback;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.BlockHitResult;
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.core.BlockPos;
@@ -58,9 +61,20 @@ public final class PhantomSignVisuals {
     private PhantomSignVisuals() {}
 
     public static void initialize() {
+        // Mobile clients can treat the Polymer replacement as air and fail to
+        // target the Interaction hitbox. Handle the normal right-click packet
+        // by tracing against the REAL server-side SignBlock outline.
+        UseItemCallback.EVENT.register((player, world, hand) -> {
+            if (!(world instanceof ServerLevel) || !(player instanceof ServerPlayer sp)
+                || player.isSpectator()) return InteractionResult.PASS;
+            return tryOpenFromRay(sp, hand);
+        });
+
         UseBlockCallback.EVENT.register((player, world, hand, hit) -> {
             if (!(world instanceof ServerLevel level) || !(player instanceof ServerPlayer sp)
                 || hand != InteractionHand.MAIN_HAND || player.isSpectator()) return InteractionResult.PASS;
+            InteractionResult edit = tryOpenFromRay(sp, hand);
+            if (edit != InteractionResult.PASS) return edit;
             if (!player.getItemInHand(hand).is(PhantomSignBlocks.SIGN_ITEM)) return InteractionResult.PASS;
             BlockPos clicked = hit.getBlockPos();
             BlockPos target = level.getBlockState(clicked).canBeReplaced()
@@ -162,11 +176,22 @@ public final class PhantomSignVisuals {
         List<Interaction> hits = level.getEntitiesOfClass(Interaction.class, box, e -> e.getTags().contains(HIT) && e.blockPosition().equals(pos));
         if (hits.isEmpty()) {
             Interaction target = new Interaction(EntityType.INTERACTION, level);
-            target.setPos(pos.getX() + .5, pos.getY() + .5, pos.getZ() + .5);
-            target.setWidth(.92f);
-            target.setHeight(.8f);
+            // EntityDimensions starts at the entity's Y coordinate, not its centre.
+            // The previous Y+0.5 placed the clickable area half a block too high.
+            target.setPos(pos.getX() + .5, pos.getY() + .02, pos.getZ() + .5);
+            target.setWidth(.94f);
+            target.setHeight(.96f);
             target.addTag(HIT);
             level.addFreshEntity(target);
+        } else {
+            // Reposition pre-existing hitboxes from 1.5.0 without replacing
+            // any stored sign or forcing players to break decorations.
+            Interaction target = hits.get(0);
+            if (Math.abs(target.getY() - (pos.getY() + .02)) > .001) {
+                target.setPos(pos.getX() + .5, pos.getY() + .02, pos.getZ() + .5);
+                target.setWidth(.94f);
+                target.setHeight(.96f);
+            }
         }
         syncFace(level, pos, state, sign.getFrontText(), true);
         syncFace(level, pos, state, sign.getBackText(), false);
@@ -177,23 +202,30 @@ public final class PhantomSignVisuals {
         List<Display.TextDisplay> displays = level.getEntitiesOfClass(Display.TextDisplay.class,
             new AABB(pos).inflate(1.2), e -> e.getTags().contains(tag) && e.blockPosition().equals(pos));
         Display.TextDisplay display = displays.isEmpty() ? null : displays.get(0);
-        if (display == null) {
+        boolean created = display == null;
+        if (created) {
             display = new Display.TextDisplay(EntityType.TEXT_DISPLAY, level);
             display.setBillboardConstraints(Display.BillboardConstraints.FIXED);
             display.setBackgroundColor(0);
-            float yaw = state.getBlock() instanceof StandingSignBlock
-                ? ((StandingSignBlock) state.getBlock()).getYRotationDegrees(state)
-                : state.getValue(WallSignBlock.FACING).toYRot();
-            if (!front) yaw += 180f;
-            double radians = Math.toRadians(yaw);
-            double offset = state.getBlock() instanceof StandingSignBlock ? .081 : .45;
-            display.setPos(pos.getX() + .5 - Math.sin(radians) * offset,
-                pos.getY() + (state.getBlock() instanceof StandingSignBlock ? .76 : .52),
-                pos.getZ() + .5 + Math.cos(radians) * offset);
-            display.setYRot(yaw);
             display.addTag(tag);
-            level.addFreshEntity(display);
         }
+        // Recalculate the visual transform on every sync, including for
+        // already-placed 1.5.0 signs. The former Y + 0.76 was too high.
+        float yaw = state.getBlock() instanceof StandingSignBlock
+            ? ((StandingSignBlock) state.getBlock()).getYRotationDegrees(state)
+            : state.getValue(WallSignBlock.FACING).toYRot();
+        if (!front) yaw += 180f;
+        double radians = Math.toRadians(yaw);
+        double offset = state.getBlock() instanceof StandingSignBlock ? .081 : .45;
+        double x = pos.getX() + .5 - Math.sin(radians) * offset;
+        double y = pos.getY() + (state.getBlock() instanceof StandingSignBlock ? .50 : .48);
+        double z = pos.getZ() + .5 + Math.cos(radians) * offset;
+        if (Math.abs(display.getX() - x) > .001
+            || Math.abs(display.getY() - y) > .001
+            || Math.abs(display.getZ() - z) > .001) {
+            display.setPos(x, y, z);
+        }
+        if (Math.abs(display.getYRot() - yaw) > .1f) display.setYRot(yaw);
 
         Component message = Component.empty();
         for (int i = 0; i < 4; i++) {
@@ -202,17 +234,40 @@ public final class PhantomSignVisuals {
                 .withStyle(style -> style.withColor(text.getColor().getTextColor())));
         }
         if (!display.getText().equals(message)) display.setText(message);
+        // Entity must enter the correct chunk at the final position.
+        if (created) level.addFreshEntity(display);
+    }
+
+    private static InteractionResult tryOpenFromRay(ServerPlayer player, InteractionHand hand) {
+        if (hand != InteractionHand.MAIN_HAND || !player.getMainHandItem().isEmpty()) {
+            return InteractionResult.PASS;
+        }
+        HitResult ray = player.pick(5.0, 0.0f, false);
+        if (!(ray instanceof BlockHitResult hit)) return InteractionResult.PASS;
+        ServerLevel level = player.level();
+        BlockPos pos = hit.getBlockPos();
+        if (!PhantomSignBlocks.isOurBlock(level.getBlockState(pos))
+            || !(level.getBlockEntity(pos) instanceof SignBlockEntity sign)) {
+            return InteractionResult.PASS;
+        }
+        if (sign.isWaxed()) return InteractionResult.SUCCESS;
+        openEditor(player, pos, sign, sign.isFacingFrontText(player));
+        return InteractionResult.SUCCESS;
     }
 
     private static void openEditor(ServerPlayer player, BlockPos pos, SignBlockEntity sign, boolean front) {
         if (sign.isWaxed()) return;
         ServerLevel level = player.level();
-        BlockPos proxy = player.blockPosition().below(2);
+        // Open the GUI at the real sign position. The old proxy under the
+        // player's feet was frequently overwritten by chunk/block packets.
+        // This is a client-only temporary vanilla sign; the server block is
+        // still the real Polymer sign with its persistent SignBlockEntity.
+        BlockPos proxy = pos.immutable();
         var state = Blocks.OAK_SIGN.defaultBlockState();
         SignBlockEntity fake = new SignBlockEntity(proxy, state);
         fake.setLevel(level);
         fake.setText(sign.getText(front), true);
-        EDITS.put(player.getUUID(), new Edit(proxy.immutable(), pos.immutable(),
+        EDITS.put(player.getUUID(), new Edit(proxy, pos.immutable(),
             level.dimension().identifier().toString(), front, ticks + 1200));
         player.connection.send(new ClientboundBlockUpdatePacket(proxy, state));
         player.connection.send(ClientboundBlockEntityDataPacket.create(fake));
@@ -240,7 +295,10 @@ public final class PhantomSignVisuals {
                 sign.setText(text, session.front());
                 sync(level, session.actual(), sign, level.getBlockState(session.actual()));
             }
-            player.connection.send(new ClientboundBlockUpdatePacket(level, session.proxy()));
+            // Never send the custom block registry ID to an unmodded client.
+            // Restore Polymer's actual vanilla-visible representation.
+            player.connection.send(new ClientboundBlockUpdatePacket(
+                session.proxy(), Blocks.STRUCTURE_VOID.defaultBlockState()));
         });
         return true;
     }
