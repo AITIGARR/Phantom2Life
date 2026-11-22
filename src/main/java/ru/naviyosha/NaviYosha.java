@@ -157,7 +157,7 @@ public final class NaviYosha implements ModInitializer {
     /** A client-only proxy SignBlockEntity lets the vanilla sign screen open. */
     private static void openEditor(ServerPlayer player, Interaction target, Display.TextDisplay display) {
         ServerLevel level = player.level();
-        BlockPos proxy = player.blockPosition().atY(level.getMinY() + 1);
+        BlockPos proxy = player.blockPosition().below(2);
         String link = target.getTags().stream().filter(s -> s.startsWith(LINK)).findFirst().orElse("");
         if (link.isEmpty()) return;
         var state = Blocks.OAK_SIGN.defaultBlockState();
