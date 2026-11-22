@@ -133,6 +133,11 @@ public final class PhantomSignBlocks {
             // A vanilla client only sees structure_void for this Polymer block,
             // so opening here targets a non-sign and fails. The server tick
             // opens the editor with a temporary real-position sign packet.
+            if (!level.isClientSide() && player instanceof net.minecraft.server.level.ServerPlayer sp) {
+                // Exact successful vanilla placement coordinates, no guessing
+                // from the clicked support block / ray on a mobile client.
+                PhantomSignVisuals.onPlaced(sp, pos);
+            }
             return true;
         }
 

@@ -60,6 +60,12 @@ public final class PhantomSignVisuals {
 
     private PhantomSignVisuals() {}
 
+    /** Called immediately after vanilla successfully places the real sign block. */
+    public static void onPlaced(ServerPlayer player, BlockPos pos) {
+        PLACEMENTS.add(new Pending(player.getUUID(), pos.immutable(),
+            player.level().dimension().identifier().toString(), ticks + 40));
+    }
+
     public static void initialize() {
         // Mobile clients can treat the Polymer replacement as air and fail to
         // target the Interaction hitbox. Handle the normal right-click packet
@@ -70,18 +76,13 @@ public final class PhantomSignVisuals {
             return tryOpenFromRay(sp, hand);
         });
 
+        // Editing is always via normal interaction, never a command.
+        // Placement is tracked from SignItem.updateCustomBlockEntityTag,
+        // which knows the EXACT block position (unlike ray-based guessing).
         UseBlockCallback.EVENT.register((player, world, hand, hit) -> {
-            if (!(world instanceof ServerLevel level) || !(player instanceof ServerPlayer sp)
-                || hand != InteractionHand.MAIN_HAND || player.isSpectator()) return InteractionResult.PASS;
-            InteractionResult edit = tryOpenFromRay(sp, hand);
-            if (edit != InteractionResult.PASS) return edit;
-            if (!player.getItemInHand(hand).is(PhantomSignBlocks.SIGN_ITEM)) return InteractionResult.PASS;
-            BlockPos clicked = hit.getBlockPos();
-            BlockPos target = level.getBlockState(clicked).canBeReplaced()
-                ? clicked : clicked.relative(hit.getDirection());
-            PLACEMENTS.add(new Pending(sp.getUUID(), target.immutable(),
-                level.dimension().identifier().toString(), ticks + 20));
-            return InteractionResult.PASS;
+            if (!(world instanceof ServerLevel) || !(player instanceof ServerPlayer sp)
+                || player.isSpectator()) return InteractionResult.PASS;
+            return tryOpenFromRay(sp, hand);
         });
 
         UseEntityCallback.EVENT.register((player, world, hand, entity, hit) -> {
@@ -125,10 +126,18 @@ public final class PhantomSignVisuals {
                 return InteractionResult.PASS;
             BlockPos pos = target.blockPosition();
             if (sp.distanceToSqr(pos.getCenter()) > 36) return InteractionResult.FAIL;
-            if (PhantomSignBlocks.isOurBlock(level.getBlockState(pos))) {
-                level.destroyBlock(pos, !sp.getAbilities().instabuild, sp);
+            // A normal tap/attack on mobile often sends an attack-entity
+            // packet, which used to DELETE the sign instantly. Never break on
+            // a normal tap. Sneak + attack is the explicit break gesture.
+            if (PhantomSignBlocks.isOurBlock(level.getBlockState(pos))
+                && level.getBlockEntity(pos) instanceof SignBlockEntity sign) {
+                if (sp.isShiftKeyDown()) {
+                    level.destroyBlock(pos, !sp.getAbilities().instabuild, sp);
+                    remove(level, pos);
+                } else {
+                    openEditor(sp, pos, sign, sign.isFacingFrontText(sp));
+                }
             }
-            remove(level, pos);
             return InteractionResult.SUCCESS;
         });
 
@@ -233,6 +242,12 @@ public final class PhantomSignVisuals {
             message = message.copy().append(text.getMessage(i, false).copy()
                 .withStyle(style -> style.withColor(text.getColor().getTextColor())));
         }
+        // A freshly placed blank sign previously appeared to vanish entirely.
+        // Show a small text-only hint until the player enters a message.
+        if (message.getString().isBlank()) {
+            message = Component.literal("[ ПКМ — написать ]")
+                .withStyle(style -> style.withColor(0x77DDEE).withItalic(true));
+        }
         if (!display.getText().equals(message)) display.setText(message);
         // Entity must enter the correct chunk at the final position.
         if (created) level.addFreshEntity(display);
@@ -258,20 +273,19 @@ public final class PhantomSignVisuals {
     private static void openEditor(ServerPlayer player, BlockPos pos, SignBlockEntity sign, boolean front) {
         if (sign.isWaxed()) return;
         ServerLevel level = player.level();
-        // Open the GUI at the real sign position. The old proxy under the
-        // player's feet was frequently overwritten by chunk/block packets.
-        // This is a client-only temporary vanilla sign; the server block is
-        // still the real Polymer sign with its persistent SignBlockEntity.
         BlockPos proxy = pos.immutable();
-        var state = Blocks.OAK_SIGN.defaultBlockState();
-        SignBlockEntity fake = new SignBlockEntity(proxy, state);
-        fake.setLevel(level);
-        fake.setText(sign.getText(front), true);
+        // The server stores the real SignBlockEntity, including all lines,
+        // dye and glow ink. Create a temporary vanilla sign ONLY in the
+        // recipient's client, then send the REAL SignBlockEntity data.
+        // The previous code created a fake entity, called setText() while
+        // bound to the server level and inadvertently triggered updates that
+        // replaced the fake sign with structure_void before GUI creation.
         EDITS.put(player.getUUID(), new Edit(proxy, pos.immutable(),
             level.dimension().identifier().toString(), front, ticks + 1200));
-        player.connection.send(new ClientboundBlockUpdatePacket(proxy, state));
-        player.connection.send(ClientboundBlockEntityDataPacket.create(fake));
-        player.connection.send(new ClientboundOpenSignEditorPacket(proxy, true));
+        player.connection.send(new ClientboundBlockUpdatePacket(
+            proxy, Blocks.OAK_SIGN.defaultBlockState()));
+        player.connection.send(ClientboundBlockEntityDataPacket.create(sign));
+        player.connection.send(new ClientboundOpenSignEditorPacket(proxy, front));
     }
 
     /** Returns true if this is a proxy-editor response for our real server block. */
@@ -306,7 +320,7 @@ public final class PhantomSignVisuals {
     private static void remove(ServerLevel level, BlockPos pos) {
         AABB box = new AABB(pos).inflate(1.2);
         for (Interaction entity : level.getEntitiesOfClass(Interaction.class,
-            box, e -> e.getTags().contains(HIT))) entity.discard();
+            box, e -> e.getTags().contains(HIT) && e.blockPosition().equals(pos))) entity.discard();
         for (Display.TextDisplay entity : level.getEntitiesOfClass(Display.TextDisplay.class,
             box, e -> e.blockPosition().equals(pos) && (e.getTags().contains(FACE_FRONT) || e.getTags().contains(FACE_BACK)))) entity.discard();
     }
