@@ -5,23 +5,25 @@
     "minecraft:dark_oak_sign"
   ],
   "result": {
-    "id": "minecraft:dark_oak_sign",
+    "id": "minecraft:pale_oak_sign",
     "count": 1,
     "components": {
       "minecraft:custom_name": {
-        "text": "Невидимая табличка",
+        "text": "Невидимая табличка (блок)",
+        "color": "aqua",
         "italic": false
       },
       "minecraft:lore": [
         {
-          "text": "Декор из фантомной мембраны",
+          "text": "Настоящий блок: редактирование на обеих сторонах",
           "color": "gray",
           "italic": false
         }
       ],
       "minecraft:enchantment_glint_override": true,
       "minecraft:custom_data": {
-        "phantom2life_kind": "sign"
+        "phantom2life_kind": "sign",
+        "phantom2life_native_sign": true
       }
     }
   }
