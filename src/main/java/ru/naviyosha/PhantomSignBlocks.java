@@ -4,6 +4,8 @@ import eu.pb4.polymer.core.api.block.PolymerBlock;
 import eu.pb4.polymer.core.api.item.PolymerItem;
 import net.fabricmc.fabric.api.object.builder.v1.block.entity.FabricBlockEntityType;
 import net.minecraft.core.Registry;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
@@ -122,6 +124,16 @@ public final class PhantomSignBlocks {
     public static final class PolymerSign extends SignItem implements PolymerItem {
         public PolymerSign(Block standingBlock, Block wallBlock, Item.Properties properties) {
             super(standingBlock, wallBlock, properties);
+        }
+
+        @Override
+        protected boolean updateCustomBlockEntityTag(BlockPos pos, Level level, Player player,
+                ItemStack itemStack, BlockState placedState) {
+            // SignItem ordinarily opens the editor immediately after placing.
+            // A vanilla client only sees structure_void for this Polymer block,
+            // so opening here targets a non-sign and fails. The server tick
+            // opens the editor with a temporary real-position sign packet.
+            return true;
         }
 
         @Override
