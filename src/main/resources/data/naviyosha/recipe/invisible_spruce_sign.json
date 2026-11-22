@@ -1,0 +1,28 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    "minecraft:phantom_membrane",
+    "minecraft:spruce_sign"
+  ],
+  "result": {
+    "id": "minecraft:spruce_sign",
+    "count": 1,
+    "components": {
+      "minecraft:custom_name": {
+        "text": "Невидимая табличка",
+        "italic": false
+      },
+      "minecraft:lore": [
+        {
+          "text": "Декор из фантомной мембраны",
+          "color": "gray",
+          "italic": false
+        }
+      ],
+      "minecraft:enchantment_glint_override": true,
+      "minecraft:custom_data": {
+        "phantom2life_kind": "sign"
+      }
+    }
+  }
+}
