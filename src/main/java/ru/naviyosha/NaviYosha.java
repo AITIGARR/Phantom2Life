@@ -4,11 +4,9 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.player.AttackEntityCallback;
-import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.commands.Commands;
-import net.minecraft.core.Direction;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
@@ -42,7 +40,7 @@ import net.minecraft.world.phys.AABB;
 import java.util.List;
 import java.util.UUID;
 
-/** Server-only invisible sign: persistent vanilla display entities, no block overrides. */
+/** Server-only Phantom2Life; newly crafted signs are real vanilla SignBlocks. */
 public final class NaviYosha implements ModInitializer {
     private static final String MARK = "p2l-sign";
     private static final String LINK = "p2l-link-";
@@ -54,36 +52,10 @@ public final class NaviYosha implements ModInitializer {
     private record EditorSession(BlockPos proxy, String link, net.minecraft.world.phys.Vec3 targetPos) {}
 
     @Override public void onInitialize() {
-        UseBlockCallback.EVENT.register((player, level, hand, hit) -> {
-            if (level.isClientSide() || hand != InteractionHand.MAIN_HAND) return InteractionResult.PASS;
-            ItemStack stack = player.getItemInHand(hand);
-            CustomData data = stack.get(DataComponents.CUSTOM_DATA);
-            if (data == null || !"sign".equals(data.copyTag().getString("phantom2life_kind").orElse(""))) return InteractionResult.PASS;
-            Direction face = hit.getDirection();
-            var support = hit.getBlockPos();
-            if (!level.getBlockState(support).isSolid()) return InteractionResult.FAIL;
-            var place = support.relative(face);
-            if (!level.getBlockState(place).isAir()) return InteractionResult.FAIL;
-            String wood = BuiltInRegistries.ITEM.getKey(stack.getItem()).getPath();
-            String link = LINK + UUID.randomUUID();
-            double x = place.getX() + .5, y = place.getY() + (face == Direction.UP ? .35 : .5), z = place.getZ() + .5;
-            ServerLevel server = (ServerLevel) level;
-            Display.TextDisplay text = new Display.TextDisplay(EntityType.TEXT_DISPLAY, server);
-            text.setPos(x, y, z);
-            text.setBillboardConstraints(Display.BillboardConstraints.FIXED);
-            text.setYRot(face.getAxis().isVertical() ? player.getYRot() + 180f : face.toYRot());
-            text.setBackgroundColor(0);
-            text.setText(Component.literal("[ Написать ]").withStyle(style -> style.withColor(0x55FFFF).withItalic(true)));
-            text.setGlowingTag(true);
-            text.addTag(MARK); text.addTag(link);
-            Interaction target = new Interaction(EntityType.INTERACTION, server);
-            target.setPos(x, y, z); target.setWidth(.9f); target.setHeight(.6f);
-            target.addTag(MARK); target.addTag(link); target.addTag(WOOD + wood); target.addTag(EMPTY);
-            server.addFreshEntity(text); server.addFreshEntity(target);
-            if (!player.getAbilities().instabuild) stack.shrink(1);
-            if (player instanceof ServerPlayer sp) openEditor(sp, target, text);
-            return InteractionResult.SUCCESS;
-        });
+        // New recipes create the real vanilla pale oak sign block.
+        // Use vanilla SignItem placement, SignBlockEntity and editor; do not
+        // convert new signs to text_display / interaction entities.
+        // Legacy signs remain editable until owners replace them.
         UseEntityCallback.EVENT.register((player, level, hand, entity, hit) -> {
             if (level.isClientSide() || !(entity instanceof Interaction target) || !target.getTags().contains(MARK)) return InteractionResult.PASS;
             if (hand != InteractionHand.MAIN_HAND) return InteractionResult.SUCCESS;
@@ -108,10 +80,12 @@ public final class NaviYosha implements ModInitializer {
             if (level.isClientSide() || !(entity instanceof Interaction target) || !target.getTags().contains(MARK)) return InteractionResult.PASS;
             Display.TextDisplay text = paired((ServerLevel) level, target);
             if (text != null) text.discard();
-            String wood = target.getTags().stream().filter(s -> s.startsWith(WOOD)).findFirst().orElse(WOOD + "oak_sign").substring(WOOD.length());
-            Item item = BuiltInRegistries.ITEM.getValue(Identifier.withDefaultNamespace(wood));
-            ItemStack drop = new ItemStack(item == null ? Items.OAK_SIGN : item);
-            CompoundTag tag = new CompoundTag(); tag.putString("phantom2life_kind", "sign");
+            // Legacy 1.2.3 ghost-sign items must also become real vanilla sign
+            // blocks when placed again; keep the server-only recipe marker.
+            ItemStack drop = new ItemStack(Items.PALE_OAK_SIGN);
+            CompoundTag tag = new CompoundTag();
+            tag.putString("phantom2life_kind", "sign");
+            tag.putBoolean("phantom2life_native_sign", true);
             drop.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
             drop.set(DataComponents.CUSTOM_NAME, Component.literal("Невидимая табличка"));
             drop.set(DataComponents.LORE, new ItemLore(List.of(Component.literal("Декор из фантомной мембраны"))));

@@ -3,8 +3,8 @@
   "id": "naviyosha",
   "version": "${version}",
   "name": "Phantom2Life",
-  "description": "Phantom membrane-powered invisible decor items for vanilla clients.",
-  "environment": "*",
+  "description": "Native invisible sign blocks and invisible frames for vanilla clients, with an optional resource pack.",
+  "environment": "server",
   "entrypoints": {
     "main": [
       "ru.naviyosha.NaviYosha"
