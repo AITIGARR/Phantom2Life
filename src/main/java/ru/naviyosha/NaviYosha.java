@@ -112,7 +112,10 @@ public final class NaviYosha implements ModInitializer {
             }
         });
         CommandRegistrationCallback.EVENT.register((dispatcher, registry, environment) ->
-            dispatcher.register(Commands.literal("p2l").then(Commands.literal("text")
+            dispatcher.register(Commands.literal("p2l")
+                .then(Commands.literal("edit").executes(ctx ->
+                    PhantomSignVisuals.editNearest(ctx.getSource().getPlayerOrException())))
+                .then(Commands.literal("text")
                 .then(Commands.argument("message", StringArgumentType.greedyString()).executes(ctx -> {
                     ServerPlayer player = ctx.getSource().getPlayerOrException();
                     String message = StringArgumentType.getString(ctx, "message");
