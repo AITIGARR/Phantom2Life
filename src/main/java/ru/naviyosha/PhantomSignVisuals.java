@@ -159,7 +159,7 @@ public final class PhantomSignVisuals {
     /** Idempotent creation and synchronization from the actual SignBlockEntity. */
     private static void sync(ServerLevel level, BlockPos pos, SignBlockEntity sign, BlockState state) {
         AABB box = new AABB(pos).inflate(1.2);
-        List<Interaction> hits = level.getEntitiesOfClass(Interaction.class, box, e -> e.getTags().contains(HIT));
+        List<Interaction> hits = level.getEntitiesOfClass(Interaction.class, box, e -> e.getTags().contains(HIT) && e.blockPosition().equals(pos));
         if (hits.isEmpty()) {
             Interaction target = new Interaction(EntityType.INTERACTION, level);
             target.setPos(pos.getX() + .5, pos.getY() + .5, pos.getZ() + .5);
@@ -175,7 +175,7 @@ public final class PhantomSignVisuals {
     private static void syncFace(ServerLevel level, BlockPos pos, BlockState state, SignText text, boolean front) {
         String tag = front ? FACE_FRONT : FACE_BACK;
         List<Display.TextDisplay> displays = level.getEntitiesOfClass(Display.TextDisplay.class,
-            new AABB(pos).inflate(1.2), e -> e.getTags().contains(tag));
+            new AABB(pos).inflate(1.2), e -> e.getTags().contains(tag) && e.blockPosition().equals(pos));
         Display.TextDisplay display = displays.isEmpty() ? null : displays.get(0);
         if (display == null) {
             display = new Display.TextDisplay(EntityType.TEXT_DISPLAY, level);
@@ -186,7 +186,7 @@ public final class PhantomSignVisuals {
                 : state.getValue(WallSignBlock.FACING).toYRot();
             if (!front) yaw += 180f;
             double radians = Math.toRadians(yaw);
-            double offset = .081;
+            double offset = state.getBlock() instanceof StandingSignBlock ? .081 : .45;
             display.setPos(pos.getX() + .5 - Math.sin(radians) * offset,
                 pos.getY() + (state.getBlock() instanceof StandingSignBlock ? .76 : .52),
                 pos.getZ() + .5 + Math.cos(radians) * offset);
@@ -250,6 +250,6 @@ public final class PhantomSignVisuals {
         for (Interaction entity : level.getEntitiesOfClass(Interaction.class,
             box, e -> e.getTags().contains(HIT))) entity.discard();
         for (Display.TextDisplay entity : level.getEntitiesOfClass(Display.TextDisplay.class,
-            box, e -> e.getTags().contains(FACE_FRONT) || e.getTags().contains(FACE_BACK))) entity.discard();
+            box, e -> e.blockPosition().equals(pos) && (e.getTags().contains(FACE_FRONT) || e.getTags().contains(FACE_BACK)))) entity.discard();
     }
 }
